@@ -68,6 +68,9 @@ update_logger.addFilter(my_filter)
 update_logger = logging.getLogger("root")
 update_logger.addFilter(my_filter)
 
+# Define a global variable to store the system prompt
+system_prompt = "Initial system prompt"
+
 # 定义一个缓存来存储消息
 from collections import defaultdict
 message_cache = defaultdict(lambda: [])
@@ -77,6 +80,7 @@ time_stamps = defaultdict(lambda: [])
 @decorators.GroupAuthorization
 @decorators.Authorization
 @decorators.APICheck
+
 async def command_bot(update, context, language=None, prompt=translator_prompt, title="", has_command=True):
     stop_event.clear()
     message, rawtext, image_url, chatid, messageid, reply_to_message_text, update_message, message_thread_id, convo_id, file_url, reply_to_message_file_content, voice_text = await GetMesageInfo(update, context)
@@ -596,6 +600,20 @@ async def unknown(update, context): # 当用户输入未知命令时，返回文
     return
     # await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
 
+async def update_system_prompt(update: Update, context: CallbackContext) -> None:
+    """Handler for updating the system prompt."""
+    global system_prompt
+    try:
+        new_prompt = ' '.join(context.args)
+        if new_prompt:
+            system_prompt = new_prompt
+            await update.message.reply_text(f"System prompt updated to: {system_prompt}")
+        else:
+            await update.message.reply_text("Please provide a new prompt.")
+    except Exception as e:
+        logger.error(f"Error updating system prompt: {e}")
+        await update.message.reply_text(f"Error updating system prompt: {e}")
+
 async def post_init(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand('info', 'Basic information'),
@@ -603,6 +621,7 @@ async def post_init(application: Application) -> None:
         BotCommand('start', 'Start the bot'),
         BotCommand('en2zh', 'Translate to Chinese'),
         BotCommand('zh2en', 'Translate to English'),
+        BotCommand('updateprompt', 'Update the system prompt'),
     ])
     description = (
         "I am an Assistant, a large language model trained by OpenAI. I will do my best to help answer your questions."
@@ -633,6 +652,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("reset", reset_chat))
     application.add_handler(CommandHandler("en2zh", lambda update, context: command_bot(update, context, "Simplified Chinese")))
     application.add_handler(CommandHandler("zh2en", lambda update, context: command_bot(update, context, "english")))
+    application.add_handler(CommandHandler("updateprompt", update_system_prompt))
     application.add_handler(InlineQueryHandler(inlinequery))
     application.add_handler(CallbackQueryHandler(button_press))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE) & ~filters.COMMAND, lambda update, context: command_bot(update, context, prompt=None, has_command=False), block = False))
